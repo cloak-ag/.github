@@ -5,7 +5,7 @@
 
   <a href="https://cloak.ag">Website</a> &nbsp;·&nbsp;
   <a href="https://docs.cloak.ag">Docs</a> &nbsp;·&nbsp;
-  <a href="https://x.com/cloak_xyz">X / Twitter</a> &nbsp;·&nbsp;
+  <a href="https://x.com/cloak_ag">X / Twitter</a> &nbsp;·&nbsp;
   <a href="https://discord.gg/cloak">Discord</a>
 </div>
 
