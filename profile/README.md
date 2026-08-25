@@ -28,9 +28,9 @@ Zero-knowledge, end to end.
 
 | Step | What happens |
 |---|---|
-| **01 Deposit** | SOL enters the shielded pool. A UTXO note is created and encrypted to your viewing key. |
+| **01 Deposit** | SOL, USDC or USDT enters that token's shielded pool. A UTXO note is created and encrypted to your viewing key. |
 | **02 ZK Proof** | Your browser generates a Groth16 proof in under 3 seconds. No server involved. |
-| **03 Relay** | The relay validates the proof and submits the signed transaction to Solana. |
+| **03 Relay** | A relayer submits your transaction, so your wallet never signs the on-chain spend. The program verifies the proof on-chain. |
 | **04 Withdraw** | Recipient claims privately. A nullifier prevents double-spending without revealing the note. |
 
 Sender and recipient addresses stay private · Amounts hidden from on-chain observers · Groth16 proof verified on Solana in < 50ms
@@ -41,12 +41,47 @@ Private by default. Auditable when required.
 
 Viewing keys let you disclose your transaction history to any auditor or compliance officer — without revealing anything to the public. Generate a viewing key from your wallet. Share it with your counterparty. They can verify every transaction, and nothing else.
 
+## Security & verification
+
+Audited, ceremony-keyed, and checkable by anyone.
+
+- **Audited program.** The live shield-pool program is built from independently audited source. Program ID `zh1eLd6rSphLejbFfJEneUwzHRfMKxgzrgkfwA6qRkW` — unchanged since launch.
+- **Ceremony-keyed verifying key.** Proofs are checked against a verifying key from a multi-party trusted setup (`cloak-transaction-0.2.0`: 6 contributors plus a public final beacon). vkey sha256 `d65073d44064ed3be10d79e52d60a06d6be6d6c01afcd5ce52cdfcfc97c5585d` (`transaction.vkey.bin`), `deb40e7b94eae17db2975d23dcf26c26db2a36a4f02d14a25830dee3e88fb93c` (`transaction.vkey.json`).
+- **Sealed artifact, multisig upgrades.** On-chain bytecode sha256 `d0f68613a08d7e0913aea67d95f04598bc070911a0e84fedd43cc6bfa18e6cf6` (239,032 bytes). Upgrades require the Squads multisig `F6HWeX5i2KjYQag6wCtxzQXeGewv6vXZihZR3EWdRL7s` (3-of-4, 1-hour time lock).
+
+Verify it yourself:
+
+```sh
+# 1. Hash the deployed program
+solana program dump -u m zh1eLd6rSphLejbFfJEneUwzHRfMKxgzrgkfwA6qRkW /tmp/cloak.so \
+  && head -c 239032 /tmp/cloak.so | shasum -a 256
+# expect d0f68613a08d7e0913aea67d95f04598bc070911a0e84fedd43cc6bfa18e6cf6
+
+# 2. Hash the public proving artifacts
+B=https://storage.googleapis.com/cloak-circuits/circuits/0.2.0
+curl -sL $B/transaction_final.zkey          | shasum -a 256
+# expect 9da7db8cb1370fc497d36a0365f1f107ab0b0c13ca66fa9f0287e5f96ee68d25
+curl -sL $B/transaction_js/transaction.wasm | shasum -a 256
+# expect 02ec02e954ae3932827ad9de51afa597ca95569aa97fec8410879c937a58aa2b
+
+# 3. Compare with the hashes above. The SDK performs the same check before every proof.
+```
+
 ## SDK
 
 Shielded flows in your product. We own the hard parts.
 
 ```ts
-import { transact, createZeroUtxo, createUtxo, NATIVE_SOL_MINT } from "@cloak.ag/sdk";
+import {
+  CLOAK_PROGRAM_ID,
+  NATIVE_SOL_MINT,
+  createUtxo,
+  createZeroUtxo,
+  generateUtxoKeypair,
+  transact,
+} from "@cloak.dev/sdk";
+
+const owner = await generateUtxoKeypair();
 
 await transact(
   {
@@ -55,8 +90,14 @@ await transact(
     externalAmount: amount,
     depositor: wallet.publicKey,
   },
-  { connection, wallet, relayUrl, programId },
+  {
+    connection,
+    programId: CLOAK_PROGRAM_ID,
+    walletPublicKey: wallet.publicKey,
+    signTransaction: wallet.signTransaction,
+    signMessage: wallet.signMessage,
+  },
 );
 ```
 
-→ [Quickstart](https://docs.cloak.ag/quickstart) &nbsp; [API Reference](https://docs.cloak.ag/api)
+→ [Quickstart](https://docs.cloak.ag/quickstart) &nbsp; [API Reference](https://docs.cloak.ag/sdk/api-reference)
